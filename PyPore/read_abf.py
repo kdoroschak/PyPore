@@ -1,13 +1,13 @@
 #! /usr/bin/env python
 """
-read-abf.py: A library for reading ABF files.
+read_abf.py: A library for reading ABF files.
 
 Originally by Kevin Karplus
 Modified by Jacob Schreiber
 
 Functions:
 
-read_current
+read_abf
         Reads an abf file of nanopore current information.
 """
 
