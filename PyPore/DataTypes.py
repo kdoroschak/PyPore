@@ -342,23 +342,25 @@ class Event(Segment):
                         std = math.sqrt(sum(seg.std**2 * seg.duration
                                             for seg in segs) / duration)
 
-                        segments.append(MetaSegment(start=ledge.start * second,
-                                                    duration=duration,
-                                                    mean=mean,
-                                                    std=std,
-                                                    event=self,
-                                                    second=self.second,
-                                                    hidden_state=states[j + 1].name))
+                        segments.append(MetaSegment(
+                            start=ledge.start * second,
+                            duration=duration,
+                            mean=mean,
+                            std=std,
+                            event=self,
+                            second=self.second,
+                            hidden_state=states[j + 1].name))
 
                     else:
-                        s = int(ledge.start*second)
+                        s = int(ledge.start * second)
                         e = int(redge.start * second + redge.n)
                         current = self.current[s: e]
-                        segments.append(Segment(start=s,
-                                                current=current,
-                                                event=self,
-                                                second=self.second,
-                                                hidden_state=states[j + 1][1].name))
+                        segments.append(Segment(
+                            start=s,
+                            current=current,
+                            event=self,
+                            second=self.second,
+                            hidden_state=states[j + 1][1].name))
                     j = i
                 i += 1
             self.segments = segments
@@ -672,268 +674,301 @@ class File(Segment):
 
         self.event_parser = parser
 
-    def close( self ):
+    def close(self):
         '''
-        Close the file, deleting all data associated with it. A wrapper for the delete function.
+        Close the file, deleting all data associated with it. A wrapper for the
+        delete function.
         '''
 
         self.delete()
 
-    def delete( self ):
+    def delete(self):
         '''
-        Delete the file, and everything that is a part of it, including the ionic current stored
-        to it, other properties, and all events. Calls delete on all events to remove them and all
-        underlying data. 
+        Delete the file, and everything that is a part of it, including the
+        ionic current stored to it, other properties, and all events. Calls
+        delete on all events to remove them and all underlying data.
         '''
-        
-        with ignored( AttributeError ):
+
+        with ignored(AttributeError):
             del self.current
 
-        with ignored( AttributeError ):
+        with ignored(AttributeError):
             del self.event_parser
 
         for event in self.events:
             event.delete()
         del self
 
-    def plot( self, limits=None, color_events=True, event_downsample=5, 
-        file_downsample=100, downsample=10, file_kwargs={ 'c':'k', 'alpha':0.66 }, 
-        event_kwargs={ 'c': 'c', 'alpha':0.66 }, **kwargs ):
+    def plot(self, limits=None, color_events=True, event_downsample=5,
+             file_downsample=100, downsample=10,
+             file_kwargs={'c': 'k', 'alpha': 0.66},
+             event_kwargs={'c': 'c', 'alpha': 0.66}, **kwargs):
         '''
-        Allows you to plot a file, optionally coloring the events in a file. You may also give a
-        dictionary of settings to color the event by, and dictionary of settings to color the
-        rest of the file by. You may also specify the downsampling for the event and the rest
-        of the file separately, because otherwise it may be too much data to plot.
+        Allows you to plot a file, optionally coloring the events in a file.
+        You may also give a dictionary of settings to color the event by, and
+        dictionary of settings to color the rest of the file by. You may also
+        specify the downsampling for the event and the rest of the file
+        separately, because otherwise it may be too much data to plot.
         '''
-        
-        step = 1./self.second
+
+        step = 1. / self.second
         second = self.second
 
         # Allows you to only plot a certain portion of the file
-        limits = limits or ( 0, len( self.current) * step )
+        limits = limits or (0, len(self.current) * step)
         start, end = limits
 
-        # If you want to apply special settings to the events and the rest of the file
-        # separately, you need to go through each part and plot it individually.
+        '''
+        If you want to apply special settings to the events and the rest of the
+        file separately, you need to go through each part and plot it
+        individually.
+        '''
         if color_events and self.n > 0:
-            # Pick out all of the events, as opposed to non-event related current
-            # in the file.
-            events = [ event for event in self.events if event.start > start and event.end < end ]
+            '''Pick out all of the events, as opposed to non-event related
+            current in the file.'''
+            events = [event for event in self.events if event.start >
+                      start and event.end < end]
 
             # If there are no events, just plot using the given settings.
             if len(events) == 0:
-                plt.plot( np.arange( start*second, end*second ), 
-                    self.current[ start*second:end*second ], **kwargs )
+                plt.plot(np.arange(start * second, end * second),
+                         self.current[start * second: end * second], **kwargs)
 
             else:
-                current = self.current[ int( start*second ):int( events[0].start*second ):\
-                    file_downsample ]
-                plt.plot( np.arange(0, len(current) )*step*file_downsample+start, 
-                    current, **file_kwargs ) 
+                current = self.current[int(start * second):
+                                       int(events[0].start * second):
+                                       file_downsample]
+                plt.plot(np.arange(0,
+                         len(current)) * step * file_downsample + start,
+                         current, **file_kwargs)
 
-            for i, event in enumerate( events ):
-                si, ei = int(event.start*second), int(event.end*second)
-                current = self.current[ si:ei:event_downsample ]
-                plt.plot( np.arange(0, len(current) )*step*event_downsample+event.start, 
-                    current, **event_kwargs )
+            for i, event in enumerate(events):
+                si, ei = int(event.start * second), int(event.end * second)
+                current = self.current[si:ei:event_downsample]
+                plt.plot(np.arange(0,
+                         len(current)) * step * event_downsample + event.start,
+                         current, **event_kwargs)
 
-                si, ei = ei, int( end*second ) if i == len(events)-1 else int( events[i+1].start*self.second )
-                current = self.current[ si:ei:file_downsample ]
-                plt.plot( np.arange( 0, len(current) )*step*file_downsample+event.end, 
-                    current, **file_kwargs )
+                si, ei = ei, int(end * second) if i == len(events) - \
+                    1 else int(events[i + 1].start * self.second)
+                current = self.current[si:ei:file_downsample]
+                plt.plot(np.arange(0,
+                         len(current)) * step * file_downsample + event.end,
+                         current, **file_kwargs)
 
         else:
-            current = self.current[ start*second:end*second:downsample ]
-            plt.plot( np.arange( 0, len(current) )*step*downsample+start, current, **kwargs )
+            current = self.current[start * second:end * second:downsample]
+            plt.plot(np.arange(0, len(current)) * step * downsample + start,
+                     current, **kwargs)
 
-        plt.title( "File {}".format( self.filename ) )
-        plt.ylabel( "Current (pA)" )
-        plt.xlabel( "Time (s)" )
-        plt.xlim( start, end )
+        plt.title("File {}".format(self.filename))
+        plt.ylabel("Current (pA)")
+        plt.xlabel("Time (s)")
+        plt.xlim(start, end)
 
-    def to_meta( self ):
+    def to_meta(self):
         '''
-        Remove the ionic current stored for this file, and do the same for all underlying
-        structures in order to remove all references to that list. 
+        Remove the ionic current stored for this file, and do the same for all
+        underlying structures in order to remove all references to that list.
         '''
-        
-        with ignored( AttributeError ):
+
+        with ignored(AttributeError):
             del self.current
 
         for event in self.events:
             event.to_meta()
 
-    def to_dict( self ):
+    def to_dict(self):
         '''
-        Return a dictionary of the important data that underlies this file. This is done with the
-        intention of producing a json from it. 
+        Return a dictionary of the important data that underlies this file.
+        This is done with the intention of producing a json from it.
         '''
-        
-        keys = [ 'filename', 'n', 'event_parser', 'mean', 'std', 'duration', 'start', 'end', 'events' ]
-        if not hasattr( self, 'end' ) and ( hasattr( self, 'start') and hasattr( self, 'duration') ):
-            setattr( self, 'end', self.start + self.duration )
-        d = { i: getattr( self, i ) for i in keys if hasattr( self, i ) }
+
+        keys = ['filename', 'n', 'event_parser', 'mean',
+                'std', 'duration', 'start', 'end', 'events']
+        if not hasattr(self, 'end') \
+           and (hasattr(self, 'start') and hasattr(self, 'duration')):
+            setattr(self, 'end', self.start + self.duration)
+        d = {i: getattr(self, i) for i in keys if hasattr(self, i)}
         d['name'] = self.__class__.__name__
         return d
 
-    def to_json( self, filename=None ):
+    def to_json(self, filename=None):
         '''
-        Return a json (in the form of a string) that represents the file, and allows for
-        reconstruction of the instance from, using cls.from_json. 
+        Return a json (in the form of a string) that represents the file, and
+        allows for reconstruction of the instance from, using cls.from_json.
         '''
-        
+
         d = self.to_dict()
 
         devents = []
         for event in d['events']:
             devent = event.to_dict()
             try:
-                devent['segments'] = [ state.to_dict() for state in devent['segments'] ]
+                devent['segments'] = [state.to_dict()
+                                      for state in devent['segments']]
                 devent['state_parser'] = devent['state_parser'].to_dict()
             except:
-                with ignored( KeyError, AttributeError ):
+                with ignored(KeyError, AttributeError):
                     del devent['segments']
                     del devent['state_parser']
-            devents.append( devent )
+            devents.append(devent)
 
         d['events'] = devents
         d['event_parser'] = d['event_parser'].to_dict()
 
-        _json = json.dumps( d, indent=4, separators=( ',', ' : ' ) )
+        _json = json.dumps(d, indent=4, separators=(',', ' : '))
 
         if filename:
-            with open( filename, 'w' ) as outfile:
-                outfile.write( _json )
+            with open(filename, 'w') as outfile:
+                outfile.write(_json)
         return _json
 
     @classmethod
-    def from_json( cls, _json ):
+    def from_json(cls, _json):
         '''
-        Read in a json (string format) and produce a file instance and all associated event
-        instances. 
+        Read in a json (string format) and produce a file instance and all
+        associated event instances.
         '''
 
         if _json.endswith(".json"):
-            with open( _json, 'r' ) as infile:
+            with open(_json, 'r') as infile:
                 _json = ''.join(line for line in infile)
 
-        d = json.loads( _json )
+        d = json.loads(_json)
 
         if d['name'] != "File":
-            raise TypeError( "JSON does not encode a file" )
+            raise TypeError("JSON does not encode a file")
 
         try:
-            file = File( filename=d['filename']+".abf" )
+            file = File(filename=d['filename'] + ".abf")
             meta = False
         except:
-            file = File( current=[], timestep=1 )
+            file = File(current=[], timestep=1)
             meta = True
 
-        file.event_parser = parser.from_json( json.dumps(d['event_parser']) )
+        file.event_parser = parser.from_json(json.dumps(d['event_parser']))
         file.events = []
 
         for _json in d['events']:
-            s, e = int(_json['start']*file.second), int(_json['end']*file.second)
+            s, e = int(_json['start'] *
+                       file.second), int(_json['end'] * file.second)
 
             if meta:
-                event = MetaEvent( **_json )
+                event = MetaEvent(**_json)
             else:
-                current = file.current[ s:e ]
-                event = Event( current=current, 
-                               start=s / file.second, 
-                               end=e / file.second, 
-                               duration=(e-s) / file.second,
-                               second=file.second, 
-                               file=file )
+                current = file.current[s:e]
+                event = Event(current=current,
+                              start=s / file.second,
+                              end=e / file.second,
+                              duration=(e - s) / file.second,
+                              second=file.second,
+                              file=file)
 
             if _json['filtered']:
                 if not meta:
-                    event.filter( order=_json['filter_order'], cutoff=_json['filter_cutoff'] )
+                    event.filter(order=_json['filter_order'], cutoff=_json[
+                                 'filter_cutoff'])
 
             if meta:
-                event.segments = [ MetaSegment( **s_json ) for s_json in _json['segments'] ]
+                event.segments = [MetaSegment(**s_json)
+                                  for s_json in _json['segments']]
             else:
-                event.segments = [ Segment( current=event.current[ int(s_json['start']*file.second):
-                                                                   int(s_json['end']*file.second) ],
-                                            second=file.second, 
-                                            event=event, 
-                                            **s_json )
-                                    for s_json in _json['segments'] ]
+                event.segments = [Segment(current=event.current[
+                                          int(s_json['start'] * file.second):
+                                          int(s_json['end'] * file.second)],
+                                          second=file.second,
+                                          event=event,
+                                          **s_json)
+                                  for s_json in _json['segments']]
 
-            event.state_parser = parser.from_json( json.dumps( _json['state_parser'] ) )
+            event.state_parser = parser.from_json(
+                json.dumps(_json['state_parser']))
             event.filtered = _json['filtered']
-            file.events.append( event )
+            file.events.append(event)
 
         return file
 
-    @classmethod 
-    def from_database( cls, database, host, password, user, AnalysisID=None, filename=None,
-                       eventDetector=None, eventDetectorParams=None, segmenter=None,
-                       segmenterParams=None, filterCutoff=None, filterOrder=None  ):
+    @classmethod
+    def from_database(cls, database, host, password, user, AnalysisID=None,
+                      filename=None, eventDetector=None,
+                      eventDetectorParams=None, segmenter=None,
+                      segmenterParams=None, filterCutoff=None,
+                      filterOrder=None):
         '''
-        Loads the cache for the file, if this exists. Can either provide the AnalysisID to unambiguously
-        know which analysis to use, or the filename if you want the most recent analysis done on that file.
+        Loads the cache for the file, if this exists. Can either provide the
+        AnalysisID to unambiguously know which analysis to use, or the filename
+        if you want the most recent analysis done on that file.
         '''
-        
-        db = MySQLDatabaseInterface(db=database, host=host, password=password, user=user)
 
-        keys = ( "ID", "Filename", "EventDetector", "EventDetectorParams",
-                 "segmenter", "segmenterParams", "FilterCutoff", "FilterOrder" )
-        vals = ( AnalysisID, filename, eventDetector, eventDetectorParams, segmenter,
-                 segmenterParams, filterCutoff, filterOrder )
+        db = MySQLDatabaseInterface(
+            db=database, host=host, password=password, user=user)
+
+        keys = ("ID", "Filename", "EventDetector", "EventDetectorParams",
+                "segmenter", "segmenterParams", "FilterCutoff", "FilterOrder")
+        vals = (AnalysisID, filename, eventDetector, eventDetectorParams,
+                segmenter, segmenterParams, filterCutoff, filterOrder)
 
         query_list = []
-        for key, val in zip( keys, vals ):
+        for key, val in zip(keys, vals):
             if val:
                 if key not in ['ID', 'FilterCutoff', 'FilterOrder']:
-                    query_list += ["{key} = '{val}'".format( key=key, val=val )]
+                    query_list += ["{key} = '{val}'".format(key=key, val=val)]
                 else:
-                    query_list += ["{key} = {val}".format( key=key, val=val )]
+                    query_list += ["{key} = {val}".format(key=key, val=val)]
 
-        query = "SELECT * FROM AnalysisMetadata WHERE "+" AND ".join(query_list)+" ORDER BY TimeStamp DESC" 
+        query = "SELECT * FROM AnalysisMetadata WHERE " + \
+                " AND ".join(query_list) + " ORDER BY TimeStamp DESC"
 
         try:
-            filename, _, AnalysisID = db.read( query )[0][0:3]
+            filename, _, AnalysisID = db.read(query)[0][0:3]
         except:
             raise DatabaseError("No analysis found with given parameters.")
 
         try:
-            file = File(filename+".abf")
+            file = File(filename + ".abf")
         except:
-            raise IOError("File must be in local directory to parse from database.")
+            raise IOError(
+                "File must be in local directory to parse from database.")
 
-        query = np.array( db.read( "SELECT ID, SerialID, start, end FROM Events \
-                                    WHERE AnalysisID = {0}".format(AnalysisID) ) )
-        EventID, SerialID, starts, ends = query[:, 0], query[:, 1], query[:, 2], query[:,3]
-        starts, ends = map( int, starts ), map( int, ends )
-        
-        file.parse( parser=MemoryParse( starts, ends ) )
+        query = np.array(db.read("SELECT ID, SerialID, start, end "
+                                 "FROM Events "
+                                 "WHERE AnalysisID = {0}".format(AnalysisID)))
+        EventID, SerialID, starts, ends = query[
+            :, 0], query[:, 1], query[:, 2], query[:, 3]
+        starts, ends = map(int, starts), map(int, ends)
+
+        file.parse(parser=MemoryParse(starts, ends))
 
         for i in SerialID:
-            state_query = np.array( db.read( "SELECT start, end FROM Segments \
-                                              WHERE EventID = {}".format(EventID[i]) ) )
-            with ignored( IndexError ):
-                starts, ends = state_query[:,0], state_query[:,1]
-                file.events[i].parse( parser=MemoryParse( starts, ends ) )
-        
+            state_query = np.array(db.read("SELECT start, end "
+                                           "FROM Segments "
+                                           "WHERE EventID = {}"
+                                           .format(EventID[i])))
+            with ignored(IndexError):
+                starts, ends = state_query[:, 0], state_query[:, 1]
+                file.events[i].parse(parser=MemoryParse(starts, ends))
+
         return file
 
+    def to_database(self, database, host, password, user):
+        '''
+        Caches the file to the database. This will create an entry in the
+        AnalysisMetadata table for this file, and will add each event to the
+        Event table, and each Segment to the Segment table. The split points
+        are stored de facto due to the start and end parameters in the events
+        and segments, and so this segmentation can be reloaded using
+        from_database.
+        '''
 
-    def to_database( self, database, host, password, user ):
-        '''
-        Caches the file to the database. This will create an entry in the AnalysisMetadata table
-        for this file, and will add each event to the Event table, and each Segment to the Segment
-        table. The split points are stored de facto due to the start and end parameters in the events
-        and segments, and so this segmentation can be reloaded using from_database.
-        '''
-        
-        db = MySQLDatabaseInterface(db=database, host=host, password=password, user=user)
+        db = MySQLDatabaseInterface(
+            db=database, host=host, password=password, user=user)
 
         event_parser_name = self.event_parser.__class__.__name__
-        event_parser_params = repr( self.event_parser )
+        event_parser_params = repr(self.event_parser)
         try:
             state_parser_name = self.events[0].state_parser.__class__.__name__
-            state_parser_params = repr( self.events[0].state_parser )
+            state_parser_params = repr(self.events[0].state_parser)
         except:
             state_parser_name = "NULL"
             state_parser_params = "NULL"
@@ -945,77 +980,82 @@ class File(Segment):
             filter_order = "NULL"
             filter_cutoff = "NULL"
 
-        metadata = "'{0}',NULL,NULL,'{1}','{2}','{3}','{4}', {5}, {6}".format( self.filename,
-                                                                     event_parser_name,
-                                                                     event_parser_params,
-                                                                     state_parser_name,
-                                                                     state_parser_params,
-                                                                     filter_order,
-                                                                     filter_cutoff
-                                                                    )
+        metadata = "'{0}',NULL,NULL,'{1}','{2}','{3}','{4}', {5}, {6}"\
+                   .format(self.filename,
+                           event_parser_name,
+                           event_parser_params,
+                           state_parser_name,
+                           state_parser_params,
+                           filter_order,
+                           filter_cutoff)
         try:
-            prevAnalysisID = db.read( "SELECT ID FROM AnalysisMetadata \
-                                       WHERE Filename = '{0}' \
-                                           AND EventDetector = '{1}' \
-                                           AND segmenter = '{2}'".format( self.filename,
-                                                                            event_parser_name,
-                                                                            state_parser_name ) )[0][0]
+            prevAnalysisID = db.read("SELECT ID FROM AnalysisMetadata "
+                                     "WHERE Filename = '{0}' "
+                                     "AND EventDetector = '{1}' "
+                                     "AND segmenter = '{2}'"
+                                     .format(self.filename,
+                                             event_parser_name,
+                                             state_parser_name))[0][0]
         except IndexError:
             prevAnalysisID = None
 
         if prevAnalysisID is not None:
-            prevAnalysisEventIDs = db.read( "SELECT ID FROM Events \
-                                 WHERE AnalysisID = {0}".format( prevAnalysisID ) )
+            prevAnalysisEventIDs = db.read("SELECT ID FROM Events "
+                                           "WHERE AnalysisID = {0}"
+                                           .format(prevAnalysisID))
             for ID in prevAnalysisEventIDs:
                 ID = ID[0]
-                db.execute( "DELETE FROM Segments WHERE EventID = {0}".format( ID ) )
-                db.execute( "DELETE FROM Events WHERE ID = {0}".format( ID) )
-            db.execute( "DELETE FROM AnalysisMetadata WHERE ID = {0}".format( prevAnalysisID ) )
+                db.execute(
+                    "DELETE FROM Segments WHERE EventID = {0}".format(ID))
+                db.execute("DELETE FROM Events WHERE ID = {0}".format(ID))
+            db.execute("DELETE FROM AnalysisMetadata WHERE ID = {0}"
+                       .format(prevAnalysisID))
 
         db.execute("INSERT INTO AnalysisMetadata VALUES({0})".format(metadata))
-        analysisID = db.read("SELECT ID FROM AnalysisMetadata ORDER BY Timestamp DESC")[0][0] 
+        analysisID = db.read(
+            "SELECT ID FROM AnalysisMetadata ORDER BY Timestamp DESC")[0][0]
 
-        for i, event in enumerate( self.events ):
-            values = "VALUES ({0},{1},{2},{3},{4},{5},NULL)".format( int(analysisID),
-                                                                     i,
-                                                                     event.start*100000,
-                                                                     event.end*100000,
-                                                                     event.mean,
-                                                                     event.std 
-                                                                    )
-            db.execute( "INSERT INTO Events " + values )
+        for i, event in enumerate(self.events):
+            values = "VALUES ({0},{1},{2},{3},{4},{5},NULL)"\
+                     .format(int(analysisID),
+                             i,
+                             event.start * 100000,
+                             event.end * 100000,
+                             event.mean,
+                             event.std)
+            db.execute("INSERT INTO Events " + values)
 
-            event_id = db.read( "SELECT ID FROM Events \
-                                 WHERE AnalysisID = '{0}' \
-                                 AND SerialID = {1}".format( analysisID,
-                                                             i 
-                                                            ) ) [-1][-1]
+            event_id = db.read("SELECT ID FROM Events "
+                               "WHERE AnalysisID = '{0}' "
+                               "AND SerialID = {1}"
+                               .format(analysisID, i))[-1][-1]
 
-            for j, seg in enumerate( event.segments ):
-                values = "VALUES ({0},{1},{2},{3},{4},{5})".format( int(event_id), 
-                                                                    j, 
-                                                                    seg.start*100000, 
-                                                                    seg.end*100000,
-                                                                    seg.mean,
-                                                                    seg.std,
-                                                                   ) 
-                db.execute( "INSERT INTO Segments " + values )
+            for j, seg in enumerate(event.segments):
+                values = "VALUES ({0},{1},{2},{3},{4},{5})" \
+                         .format(int(event_id),
+                                 j,
+                                 seg.start * 100000,
+                                 seg.end * 100000,
+                                 seg.mean,
+                                 seg.std)
+                db.execute("INSERT INTO Segments " + values)
 
     @property
-    def n( self ):
-        return len( self.events )
+    def n(self):
+        return len(self.events)
 
 
-class Experiment( object ):
+class Experiment(object):
     '''
-    An experiment represents a series of files which all are to be analyzed together, and have
-    their results bundled. This may be many files run on the same nanopore experiment, or the
-    same conditions being tested over multiple days. It attempts to construct a fast and efficient
-    way to store the data. Functions are as close to the file functions as possible, as you are
-    simply applying these functions over multiple files.
+    An experiment represents a series of files which all are to be analyzed
+    together, and have their results bundled. This may be many files run on the
+    same nanopore experiment, or the same conditions being tested over multiple
+    days. It attempts to construct a fast and efficient way to store the data.
+    Functions are as close to the file functions as possible, as you are simply
+    applying these functions over multiple files.
     '''
 
-    def __init__( self, filenames, name=None ):
+    def __init__(self, filenames, name=None):
         '''
         Take in the filenames and store them for later analysis
         '''
@@ -1024,52 +1064,55 @@ class Experiment( object ):
         self.name = name or "Experiment"
         self.files = []
 
-    def parse( self, event_detector=lambda_event_parser( threshold=90 ), 
-        segmenter=SpeedyStatSplit( prior_segments_per_second=10, cutoff_freq=2000. ),
-        filter_params=(1,2000),
-        verbose=True, meta=False  ):
+    def parse(self, event_detector=lambda_event_parser(threshold=90),
+              segmenter=SpeedyStatSplit(
+                  prior_segments_per_second=10, cutoff_freq=2000.),
+              filter_params=(1, 2000),
+              verbose=True, meta=False):
         '''
-        Go through each of the files and parse them appropriately. If the segmenter
-        is set to None, then do not segment the events. If you want to filter the
-        events, pass in filter params of (order, cutoff), otherwise None.
+        Go through each of the files and parse them appropriately. If the
+        segmenter is set to None, then do not segment the events. If you want
+        to filter the events, pass in filter params of (order, cutoff),
+        otherwise None.
         '''
 
-        # Go through each file one at a time as a generator to ensure many files
-        # are not open at the same time.
-        for file in it.imap( File, self.filenames ):
+        '''Go through each file one at a time as a generator to ensure many
+        files are not open at the same time.'''
+        for file in it.imap(File, self.filenames):
             if verbose:
-                print "Opening {}".format( file.filename )
+                print "Opening {}".format(file.filename)
 
-            file.parse( parser=event_detector )
+            file.parse(parser=event_detector)
 
             if verbose:
-                print "\tDetected {} Events".format( file.n )
-            
+                print "\tDetected {} Events".format(file.n)
+
             # If using a segmenter, then segment all of the events in this file
-            for i, event in enumerate( file.events ):
+            for i, event in enumerate(file.events):
                 if filter_params is not None:
-                    event.filter( *filter_params )
+                    event.filter(*filter_params)
                 if segmenter is not None:
-                    event.parse( parser=segmenter )
+                    event.parse(parser=segmenter)
                     if verbose:
-                        print "\t\tEvent {} has {} segments".format( i+1, event.n )
+                        print "\t\tEvent {} has {} segments" \
+                              .format(i + 1, event.n)
 
             if meta:
                 file.to_meta()
-            self.files.append( file )
+            self.files.append(file)
 
-    def apply_hmm( self, hmm, filter=None, indices=None ):
+    def apply_hmm(self, hmm, filter=None, indices=None):
         segments = []
-        for event in self.get( "events", filter=filter, indices=indices ):
-            _, segs = hmm.viterbi( np.array( seg.mean for seg in event.segments ) )
-            segments = np.concatenate( ( segments, segs ) )
+        for event in self.get("events", filter=filter, indices=indices):
+            _, segs = hmm.viterbi(np.array(seg.mean for seg in event.segments))
+            segments = np.concatenate((segments, segs))
         return segments
 
-    def delete( self ):
-        with ignored( AttributeError ):
+    def delete(self):
+        with ignored(AttributeError):
             del self.events
 
-        with ignored( AttributeError ):
+        with ignored(AttributeError):
             del self.segments
 
         for file in self.files:
@@ -1077,40 +1120,43 @@ class Experiment( object ):
         del self
 
     @property
-    def n( self ):
-        return len( self.files )
+    def n(self):
+        return len(self.files)
 
     @property
-    def events( self ):
+    def events(self):
         '''
         Return all the events in all files.
         '''
-        
+
         try:
-            return reduce( list.__add__, [ file.events for file in self.files ] )
+            return reduce(list.__add__, [file.events for file in self.files])
         except:
             return []
 
     @property
-    def segments( self ):
+    def segments(self):
         '''
         Return all segments from all events in an unordered manner.
         '''
 
         try:
-            return reduce( list.__add__, [ event.segments for event in self.events ] )
+            return reduce(list.__add__,
+                          [event.segments for event in self.events])
         except:
             return []
- 
-class Sample( object ):
+
+
+class Sample(object):
     '''A container for events all suggested to be from the same substrate.'''
-    def __init__( self, events=[], files=[], label=None ):
+
+    def __init__(self, events=[], files=[], label=None):
         self.events = events
         self.files = files
         self.label = label
 
-    def delete( self ):
-        with ignored( AttributeError ):
+    def delete(self):
+        with ignored(AttributeError):
             for file in self.files:
                 file.delete()
 
