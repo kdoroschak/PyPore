@@ -35,7 +35,8 @@ Event: A container for both the ionic current of a given event, and metadata,
 '''
 
 import numpy as np
-from read_abf import *
+from read_abf import read_abf
+from read_fast5 import read_fast5
 from matplotlib import pyplot as plt
 from hmm import *
 from core import *
@@ -625,19 +626,26 @@ class Event(Segment):
 
 class File(Segment):
     '''
-    A container for the raw ionic current pulled from a .abf file, and metadata
-    as to the events detected in the file.
+    A container for the raw ionic current pulled from a file (.abf, .f5, or
+    .fast5), and metadata as to the events detected in the file.
     '''
 
     def __init__(self, filename=None, current=None, timestep=None, **kwargs):
         '''
-        Must either provide the current and time step, or the filename
+        Must either provide the current and time step, or the filename.
         '''
         if current is not None and timestep is not None:
             filename = ""
-        elif filename and current is None and timestep is None:
-            timestep, current = read_abf(filename)
-            filename = filename.split("\\")[-1].split(".abf")[0]
+        elif filename and (current is None or timestep is None):
+            file_type = filename.split(".")[-1]
+            if file_type == "abf":
+                timestep, current = read_abf(filename)
+                # filename = filename.split("\\")[-1].split(".abf")[0]
+            elif file_type == "fast5" or file_type == "f5":
+                timestep, current = read_fast5(filename)
+            else:
+                raise ValueError("File must be one of: *.abf, *.f5, *.fast5")
+            filename = ".".join(filename.split("\\").split(".")["-1"])
         else:
             raise SyntaxError("Must provide current and timestep, or filename"
                               "corresponding to a valid abf file.")
