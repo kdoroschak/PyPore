@@ -49,6 +49,7 @@ import json
 # from itertools import chain, izip, tee, combinations
 import itertools as it
 import re
+import os
 
 
 class MetaEvent(MetaSegment):
@@ -134,7 +135,10 @@ class MetaEvent(MetaSegment):
                             idx = float(re.sub("[^0-9]", "", state.name)) / n
                             hmm_color_cycle.append(cm(idx))
 
-                except:
+                except Exception as e:
+                    # TODO temporary code to gradually replace bare excepts
+                    print "Bare exception caught:", e.message
+                    raise e
                     '''
                     If using any other naming scheme, assign a color from the
                     colormap to each state without any ordering, since none was
@@ -208,7 +212,10 @@ class MetaEvent(MetaSegment):
         try:
             plt.title("MetaEvent at {} at {}s".format(
                 self.file.filename, self.start))
-        except:
+        except Exception as e:
+            # TODO temporary code to gradually replace bare excepts
+            print "Bare exception caught:", e.message
+            raise e
             plt.title("MetaEvent at {}s".format(self.start))
 
         plt.xlabel("Time (s)")
@@ -257,7 +264,10 @@ class MetaEvent(MetaSegment):
     def n(self):
         try:
             return len(self.segments)
-        except:
+        except Exception as e:
+            # TODO temporary code to gradually replace bare excepts
+            print "Bare exception caught:", e.message
+            raise e
             return 0
 
 
@@ -272,7 +282,8 @@ class Event(Segment):
         if len(segments) > 0:
             try:
                 current = np.concatenate((seg.current for seg in segments))
-            except:
+            except TypeError:
+                # KD Note: Removed bare except-- may need to catch other errors
                 current = []
 
         Segment.__init__(self, current, filtered=False,
@@ -313,7 +324,7 @@ class Event(Segment):
         self.segments = parser.parse(self.current)
         for segment in self.segments:
             segment.event = self
-            segment.scale(float(self.file.second))
+            # segment.scale(float(self.file.second))
 
         # If using HMM-Guided Segmentation, run the segments through the HMM
         if hmm:
@@ -438,7 +449,10 @@ class Event(Segment):
                             idx = float(re.sub("[^0-9]", "", state.name)) / n
                             hmm_color_cycle.append(cm(idx))
 
-                except:
+                except Exception as e:
+                    # TODO temporary code to gradually replace bare excepts
+                    print "Bare exception caught:", e.message
+                    raise e
                     '''
                     If using any other naming scheme, assign a color from the
                     colormap to each state without any ordering, since none was
@@ -521,7 +535,10 @@ class Event(Segment):
         try:
             plt.title("Event at {} at {}s".format(
                 self.file.filename, self.start))
-        except:
+        except Exception as e:
+            # TODO temporary code to gradually replace bare excepts
+            print "Bare exception caught:", e.message
+            raise e
             plt.title("Event at {}s".format(self.start))
 
         plt.xlabel("Time (s)")
@@ -642,18 +659,22 @@ class File(Segment):
             file_type = filename.split(".")[-1]
             if file_type == "abf":
                 timestep, current = read_abf(filename)
+                ''' Workaround for removing explicit scaling: observations per
+                second. Disclaimer: no abf files to test with.'''
+                obs_per_sec = 1000. / timestep
                 # filename = filename.split("\\")[-1].split(".abf")[0]
             elif file_type == "fast5" or file_type == "f5":
-                timestep, current = read_fast5(filename)
+                obs_per_sec, current = read_fast5(filename)
             else:
                 raise ValueError("File must be one of: *.abf, *.f5, *.fast5")
-            filename = ".".join(filename.split("\\").split(".")["-1"])
+            # filename = ".".join(filename.split(".")[:-1])
+            filename = os.path.abspath(filename)
         else:
             raise SyntaxError("Must provide current and timestep, or filename"
                               "corresponding to a valid abf file.")
 
         Segment.__init__(self, current=current, filename=filename,
-                         second=1000. / timestep, events=[], sample=None)
+                         obs_per_sec=obs_per_sec, events=[])  # , sample=None)
 
     def __getitem__(self, index):
         return self.events[index]
@@ -664,14 +685,12 @@ class File(Segment):
         parser must have a .parse method which returns a tuple corresponding to
         the start of each event, and the ionic current in them.
         '''
-
         self.events = [Event(current=seg.current,
-                             start=seg.start / self.second,
-                             end=(seg.start + seg.duration) / self.second,
-                             duration=seg.duration / self.second,
-                             second=self.second,
+                             start=seg.start,
+                             end=(seg.start + seg.duration),
+                             duration=seg.duration,
+                             obs_per_sec=self.obs_per_sec,
                              file=self) for seg in parser.parse(self.current)]
-
         self.event_parser = parser
 
     def close(self):
@@ -711,12 +730,16 @@ class File(Segment):
         separately, because otherwise it may be too much data to plot.
         '''
 
-        step = 1. / self.second
-        second = self.second
+        # step = 1. / self.second
+        # second = self.second
 
         # Allows you to only plot a certain portion of the file
-        limits = limits or (0, len(self.current) * step)
+        limits = limits or (0, len(self.current))  # TODO why * step??
         start, end = limits
+        start = int(start)
+        end = int(end)
+
+        # TODO fix time scale
 
         '''
         If you want to apply special settings to the events and the rest of the
@@ -731,35 +754,35 @@ class File(Segment):
 
             # If there are no events, just plot using the given settings.
             if len(events) == 0:
-                plt.plot(np.arange(start * second, end * second),
-                         self.current[start * second: end * second], **kwargs)
+                plt.plot(np.arange(start, end),
+                         self.current[start:end], **kwargs)
 
             else:
-                current = self.current[int(start * second):
-                                       int(events[0].start * second):
+                current = self.current[int(start):
+                                       int(events[0].start):
                                        file_downsample]
                 plt.plot(np.arange(0,
-                         len(current)) * step * file_downsample + start,
+                         len(current)) * file_downsample + start,
                          current, **file_kwargs)
 
             for i, event in enumerate(events):
-                si, ei = int(event.start * second), int(event.end * second)
+                si, ei = int(event.start), int(event.end)
                 current = self.current[si:ei:event_downsample]
                 plt.plot(np.arange(0,
-                         len(current)) * step * event_downsample + event.start,
+                         len(current)) * event_downsample + event.start,
                          current, **event_kwargs)
 
-                si, ei = ei, int(end * second) if i == len(events) - \
-                    1 else int(events[i + 1].start * self.second)
+                si, ei = ei, int(end) if i == len(events) - \
+                    1 else int(events[i + 1].start)
                 current = self.current[si:ei:file_downsample]
                 plt.plot(np.arange(0,
-                         len(current)) * step * file_downsample + event.end,
+                         len(current)) * file_downsample + event.end,
                          current, **file_kwargs)
 
         else:
-            current = self.current[start * second:end * second:downsample]
-            plt.plot(np.arange(0, len(current)) * step * downsample + start,
-                     current, **kwargs)
+            current = self.current[start:end:downsample]
+            timescale = np.arange(0, self.obs_per_sec) * downsample + start
+            plt.plot(timescale, current, **kwargs)
 
         plt.title("File {}".format(self.filename))
         plt.ylabel("Current (pA)")
@@ -784,8 +807,8 @@ class File(Segment):
         This is done with the intention of producing a json from it.
         '''
 
-        keys = ['filename', 'n', 'event_parser', 'mean',
-                'std', 'duration', 'start', 'end', 'events']
+        keys = ['filename', 'n', 'event_parser', 'mean', 'std', 'duration',
+                'start', 'end', 'events', 'obs_per_sec']
         if not hasattr(self, 'end') \
            and (hasattr(self, 'start') and hasattr(self, 'duration')):
             setattr(self, 'end', self.start + self.duration)
@@ -808,14 +831,17 @@ class File(Segment):
                 devent['segments'] = [state.to_dict()
                                       for state in devent['segments']]
                 devent['state_parser'] = devent['state_parser'].to_dict()
-            except:
+            except (KeyError, AttributeError):
                 with ignored(KeyError, AttributeError):
                     del devent['segments']
                     del devent['state_parser']
             devents.append(devent)
 
         d['events'] = devents
-        d['event_parser'] = d['event_parser'].to_dict()
+        try:
+            d['event_parser'] = d.get('event_parser').to_dict()
+        except AttributeError:
+            pass
 
         _json = json.dumps(d, indent=4, separators=(',', ' : '))
 
@@ -843,7 +869,10 @@ class File(Segment):
         try:
             file = File(filename=d['filename'] + ".abf")
             meta = False
-        except:
+        except Exception as e:
+            # TODO temporary code to gradually replace bare excepts
+            print "Bare exception caught:", e.message
+            raise e
             file = File(current=[], timestep=1)
             meta = True
 
@@ -922,12 +951,18 @@ class File(Segment):
 
         try:
             filename, _, AnalysisID = db.read(query)[0][0:3]
-        except:
+        except Exception as e:
+            # TODO temporary code to gradually replace bare excepts
+            print "Bare exception caught:", e.message
+            raise e
             raise DatabaseError("No analysis found with given parameters.")
 
         try:
             file = File(filename + ".abf")
-        except:
+        except Exception as e:
+            # TODO temporary code to gradually replace bare excepts
+            print "Bare exception caught:", e.message
+            raise e
             raise IOError(
                 "File must be in local directory to parse from database.")
 
@@ -969,14 +1004,20 @@ class File(Segment):
         try:
             state_parser_name = self.events[0].state_parser.__class__.__name__
             state_parser_params = repr(self.events[0].state_parser)
-        except:
+        except Exception as e:
+            # TODO temporary code to gradually replace bare excepts
+            print "Bare exception caught:", e.message
+            raise e
             state_parser_name = "NULL"
             state_parser_params = "NULL"
 
         try:
             filter_order = self.events[0].filter_order
             filter_cutoff = self.events[0].filter_cutoff
-        except:
+        except Exception as e:
+            # TODO temporary code to gradually replace bare excepts
+            print "Bare exception caught:", e.message
+            raise e
             filter_order = "NULL"
             filter_cutoff = "NULL"
 
@@ -1131,7 +1172,10 @@ class Experiment(object):
 
         try:
             return reduce(list.__add__, [file.events for file in self.files])
-        except:
+        except Exception as e:
+            # TODO temporary code to gradually replace bare excepts
+            print "Bare exception caught:", e.message
+            raise e
             return []
 
     @property
@@ -1143,7 +1187,10 @@ class Experiment(object):
         try:
             return reduce(list.__add__,
                           [event.segments for event in self.events])
-        except:
+        except Exception as e:
+            # TODO temporary code to gradually replace bare excepts
+            print "Bare exception caught:", e.message
+            raise e
             return []
 
 

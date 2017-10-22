@@ -30,8 +30,7 @@ class MetaSegment(object):
             self.max = np.max(self.current)
             del self.current
 
-        # Fill in start, end, and duration given that you only have two of
-        # them.
+        # Fill in start, end, and duration given that you only have two of them
         if hasattr(self, "start") and hasattr(self, "end") \
            and not hasattr(self, "duration"):
             self.duration = self.end - self.start
@@ -78,7 +77,8 @@ class MetaSegment(object):
         converting the dict to a JSON.
         '''
 
-        keys = ['mean', 'std', 'min', 'max', 'start', 'end', 'duration']
+        keys = ['mean', 'std', 'min', 'max', 'start', 'end', 'duration',
+                'obs_per_sec']
         d = {i: getattr(self, i) for i in keys if hasattr(self, i)}
         d['name'] = self.__class__.__name__
         return d
@@ -134,17 +134,29 @@ class Segment(object):
         '''
         self.current = current
 
+        valid_attrs = ['mean', 'std', 'min', 'max', 'start', 'end', 'duration',
+                       'obs_per_sec', 'events', 'filename', 'copy', 'filtered',
+                       'segments', 'file']
+        # required_attrs = ['obs_per_sec']
+
         for key, value in kwargs.iteritems():
+            # if key in required_attrs:
+            #     required_attrs.remove(key)
             if hasattr(self, key):
                 continue
+            if key not in valid_attrs:
+                raise ValueError("Attribute %s not allowed for Segment." % key)
             with ignored(AttributeError):
                 setattr(self, key, value)
+        # if len(required_attrs) > 0:
+        #     pass
+            # TODO search for attributes already existing and throw an error if
+            # there are some still missing
 
     def __repr__(self):
         '''
         The string representation of this object is the JSON.
         '''
-
         return self.to_json()
 
     def __len__(self):
@@ -152,7 +164,6 @@ class Segment(object):
         The length of a segment is the length of the underlying ionic current
         array.
         '''
-
         return self.n
 
     def to_dict(self):
@@ -160,8 +171,8 @@ class Segment(object):
         Return a dict representation of the metadata, usually used prior to
         converting the dict to a JSON.
         '''
-
-        keys = ['mean', 'std', 'min', 'max', 'start', 'end', 'duration']
+        keys = ['mean', 'std', 'min', 'max', 'start', 'end', 'duration',
+                'obs_per_sec']
         d = {i: getattr(self, i) for i in keys if hasattr(self, i)}
         d['name'] = self.__class__.__name__
         return d
@@ -171,7 +182,6 @@ class Segment(object):
         Return a JSON representation of this, by reporting the important
         metadata.
         '''
-
         _json = json.dumps(self.to_dict(), indent=4, separators=(',', ' : '))
         if filename:
             with open(filename, 'w') as outfile:
@@ -183,12 +193,11 @@ class Segment(object):
         Convert from a segment to a 'metasegment', which stores only metadata
         about the segment and not the full array of ionic current.
         '''
-
-        for key in ['mean', 'std', 'min', 'max', 'end', 'start', 'duration']:
+        for key in ['mean', 'std', 'min', 'max', 'end', 'start', 'duration',
+                    'obs_per_sec']:
             with ignored(KeyError, AttributeError):
                 self.__dict__[key] = getattr(self, key)
         del self.current
-
         self.__class__ = type("MetaSegment", (MetaSegment, ), self.__dict__)
 
     def delete(self):
@@ -196,21 +205,19 @@ class Segment(object):
         Deleting this segment requires deleting its reference to the ionic
         current array, and then deleting itself.
         '''
-
         with ignored(AttributeError):
             del self.current
-
         del self
 
-    def scale(self, sampling_freq):
-        '''
-        Rescale all of the values to go from samples to seconds.
-        '''
+    # def scale(self, sampling_freq):
+    #     '''
+    #     Rescale all of the values to go from samples to seconds.
+    #     '''
 
-        with ignored(AttributeError):
-            self.start /= sampling_freq
-            self.end /= sampling_freq
-            self.duration /= sampling_freq
+    #     with ignored(AttributeError):
+    #         self.start /= sampling_freq
+    #         self.end /= sampling_freq
+    #         self.duration /= sampling_freq
 
     @property
     def mean(self):
@@ -238,7 +245,6 @@ class Segment(object):
         Read in a segment from a JSON and return a metasegment object. Either
         pass in a file which has a segment stored, or an actual JSON object.
         '''
-
         assert filename or json and not (filename and json)
         import re
 
@@ -254,14 +260,18 @@ class Segment(object):
 
         current = np.array([float(x) for x in attrs['current'][1:-1].split()])
         del attrs['current']
+        obs_per_sec = attrs['obs_per_sec']
 
-        return Segment(current, **attrs)
+        return Segment(current, obs_per_sec, **attrs)
 
 
 @contextmanager
 def ignored(*exceptions):
     '''
-    Replace the "try, except: pass" paradigm by replacing those three lines
+    Replace the "try, except Exception as e:
+            # TODO temporary code to gradually replace bare excepts
+            print "Bare exception caught:", e.message
+            raise e pass" paradigm by replacing those three lines
     with a single line. Taken from the latest 3.4 python update push by Raymond
     Hettinger, see: http://hg.python.org/cpython/rev/406b47c64480
     '''

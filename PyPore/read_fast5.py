@@ -42,7 +42,6 @@ def get_scaled_raw_current(f5, raw_loc=None, metadata_loc=None):
                         "/Raw/Reads/Read_<>/Signal"]
     default_metadata_locs = ["/Raw/Channel_<>/Meta",
                              "/UniqueGlobalKey/channel_id"]
-
     raw = None
     if raw_loc is not None:
         raw = get_raw(f5, raw_loc)
@@ -63,7 +62,6 @@ def get_scaled_raw_current(f5, raw_loc=None, metadata_loc=None):
     else:
         for default_loc in default_metadata_locs:
             meta = get_scale_factors(f5, default_loc)
-            print meta
             if meta is not None:
                 offset, rng, digitisation = meta
                 break
